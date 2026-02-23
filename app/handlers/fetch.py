@@ -666,6 +666,56 @@ class FetchList(BaseFetch):
         self._get_main_container()
 
 
+class FetchEpisode(BaseFetch):
+    """Scrapes a single episode detail page, including synopsis."""
+
+    def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
+        super().__init__(soup, query, code, ok)
+
+    def _get_main_container(self) -> None:
+        if self.soup is None:
+            return
+
+        container = self.soup.find("div", class_="app-body")
+        if container is None:
+            return
+
+        # Drama + episode title (e.g. "The Prisoner of Beauty Episode 1")
+        film_title = container.find("h1", class_="film-title")
+        self.info["title"] = film_title.get_text(strip=True) if film_title else ""
+
+        # Individual episode title (e.g. "Episode Title: Feud")
+        episode_title_tag = container.find("h2", class_="text-md")
+        if episode_title_tag:
+            raw = episode_title_tag.get_text(strip=True)
+            self.info["episode_title"] = raw.replace("Episode Title:", "").strip()
+
+        # Cover image
+        cover_img = container.find("img", class_="img-responsive")
+        self.info["image"] = cover_img["src"] if cover_img and cover_img.get("src") else ""
+
+        # Rating
+        rating_box = container.find("div", class_="col-film-rating")
+        if rating_box:
+            self.info["rating"] = self._handle_rating(rating_box.find("div"))
+
+        # Synopsis
+        synopsis = container.find("div", class_="show-synopsis")
+        self.info["synopsis"] = synopsis.get_text(strip=True) if synopsis else ""
+
+        # Air date
+        show_details = container.find("div", class_="show-details")
+        if show_details:
+            for li in show_details.find_all("li"):
+                b = li.find("b")
+                if b and "Aired" in b.get_text():
+                    self.info["air_date"] = li.get_text(strip=True).replace("Aired:", "").strip()
+                    break
+
+    def _get(self) -> None:
+        self._get_main_container()
+
+
 class FetchEpisodes(BaseFetch):
     def __init__(self, soup, query, code, ok):
         super().__init__(soup, query, code, ok)

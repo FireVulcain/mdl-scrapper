@@ -4,6 +4,7 @@ from app.handlers.fetch import (
     FetchCast,
     FetchDrama,
     FetchDramaList,
+    FetchEpisode,
     FetchEpisodes,
     FetchList,
     FetchPerson,
@@ -41,6 +42,7 @@ fs = {
     "lists": FetchList,
     "dramalist": FetchDramaList,
     "episodes": FetchEpisodes,
+    "episode": FetchEpisode,
 }
 
 
