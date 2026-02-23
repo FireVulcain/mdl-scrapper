@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Type, TypeVar, Union
 from urllib.parse import urljoin
 
-import primp
+import cloudscraper
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 
@@ -48,7 +48,7 @@ class Parser:
         soup = None
 
         try:
-            client = primp.Client(impersonate="chrome_131", impersonate_os="linux")
+            client = cloudscraper.create_scraper()
             resp = client.get(url, headers=Parser.headers)
 
             # set the main soup var
