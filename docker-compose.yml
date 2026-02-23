@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    mem_limit: 5000m
+    deploy:
+      resources:
+        limits:
+          memory: 5000m
+      restart_policy:
+        condition: unless-stopped
+        delay: 5s # Optional: delay between restart attempts
+        window: 120s # Optional: time to wait after a restart to determine if it was successful
+    ports:
+      - 8035:8000
