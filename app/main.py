@@ -101,6 +101,36 @@ async def lists(list_id: str, response: Response) -> Dict[str, Any]:
     return r
 
 
+@app.get("/id/{drama_id}/threads")
+async def fetch_threads(
+    drama_id: str,
+    response: Response,
+    page: int = 1,
+    limit: int = 50,
+    sort: str = "recent",
+    after: int | None = None,
+) -> Any:
+    # extract numeric id from slug (e.g. "687393-the-prisoner-of-beauty" -> "687393")
+    numeric_id = drama_id.split("-")[0]
+
+    params: Dict[str, Any] = {
+        "t": numeric_id,
+        "c": "title",
+        "limit": limit,
+        "page": page,
+        "sort": sort,
+        "lang": "en-US",
+    }
+    if after is not None:
+        params["after"] = after
+
+    client = cloudscraper.create_scraper()
+    resp = client.get("https://mydramalist.com/v1/threads", params=params)
+
+    response.status_code = resp.status_code
+    return resp.json()
+
+
 # get seasonal drama list -- official api available, use it with cloudflare bypass
 @app.get("/seasonal/{year}/{quarter}")
 async def mdlSeasonal(year: int, quarter: int) -> Any:
