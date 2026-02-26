@@ -730,18 +730,18 @@ def _get_main_container(self) -> None:
         link_tag = item.find("a", class_="text-primary")
         if img_tag is None or link_tag is None:
             continue
-            
-        # Get original src and transform it
-        original_src = img_tag.get("src", "")
-        transformed_src = (
-            original_src
-            .replace(/t\.jpg(\?.*)?$/, "f.jpg$1")
-            .replace(/_4t\./, "_4f.")
-        )
-        
+
         href = link_tag.get("href", "").strip()
+        img_url = img_tag.get("src", "")
+
+        # --- transform thumbnail URL to full-size ---
+        if img_url.endswith("t.jpg"):
+            img_url = img_url[:-5] + "f.jpg"  # replace last "t.jpg" with "f.jpg"
+        elif "_4t." in img_url:
+            img_url = img_url.replace("_4t.", "_4f.")
+
         recs.append({
-            "img": transformed_src,  # Store transformed URL directly
+            "img": img_url,
             "title": link_tag.get_text(strip=True),
             "url": href,
         })
