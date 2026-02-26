@@ -716,38 +716,44 @@ class FetchEpisode(BaseFetch):
         self._get_main_container()
 
 
-def _get_main_container(self) -> None:
-    if self.soup is None:
-        return
+class FetchRecommendations(BaseFetch):
+    def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
+        super().__init__(soup, query, code, ok)
 
-    container = self.soup.find("div", class_="app-body")
-    if container is None:
-        return
+    def _get_main_container(self) -> None:
+        if self.soup is None:
+            return
 
-    recs: List[Dict[str, Any]] = []
-    for item in container.find_all("div", class_="box-body"):
-        img_tag = item.find("img", class_="img-responsive")
-        link_tag = item.find("a", class_="text-primary")
-        if img_tag is None or link_tag is None:
-            continue
+        container = self.soup.find("div", class_="app-body")
+        if container is None:
+            return
 
-        href = link_tag.get("href", "").strip()
-        img_url = img_tag.get("src", "")
+        recs: List[Dict[str, Any]] = []
+        for item in container.find_all("div", class_="box-body"):
+            img_tag = item.find("img", class_="img-responsive")
+            link_tag = item.find("a", class_="text-primary")
+            if img_tag is None or link_tag is None:
+                continue
 
-        # --- transform thumbnail URL to full-size ---
-        if img_url.endswith("t.jpg"):
-            img_url = img_url[:-5] + "f.jpg"  # replace last "t.jpg" with "f.jpg"
-        elif "_4t." in img_url:
-            img_url = img_url.replace("_4t.", "_4f.")
+            href = link_tag.get("href", "").strip()
+            img_url = img_tag.get("src", "")
 
-        recs.append({
-            "img": img_url,
-            "title": link_tag.get_text(strip=True),
-            "url": href,
-        })
+            # --- transform thumbnail URL to full-size ---
+            if img_url.endswith("t.jpg"):
+                img_url = img_url[:-5] + "f.jpg"  # replace last "t.jpg" with "f.jpg"
+            elif "_4t." in img_url:
+                img_url = img_url.replace("_4t.", "_4f.")
 
-    self.info["recommendations"] = recs
+            recs.append({
+                "img": img_url,
+                "title": link_tag.get_text(strip=True),
+                "url": href,
+            })
 
+        self.info["recommendations"] = recs
+
+    def _get(self) -> None:
+        self._get_main_container()
 
 
 class FetchEpisodes(BaseFetch):
