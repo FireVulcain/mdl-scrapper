@@ -716,6 +716,37 @@ class FetchEpisode(BaseFetch):
         self._get_main_container()
 
 
+class FetchRecommendations(BaseFetch):
+    def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
+        super().__init__(soup, query, code, ok)
+
+    def _get_main_container(self) -> None:
+        if self.soup is None:
+            return
+
+        container = self.soup.find("div", class_="app-body")
+        if container is None:
+            return
+
+        recs: List[Dict[str, Any]] = []
+        for item in container.find_all("div", class_="box-body"):
+            img_tag = item.find("img", class_="img-responsive")
+            link_tag = item.find("a", class_="text-primary")
+            if img_tag is None or link_tag is None:
+                continue
+            href = link_tag.get("href", "").strip()
+            recs.append({
+                "img": img_tag.get("src", ""),
+                "title": link_tag.get_text(strip=True),
+                "url": href,
+            })
+
+        self.info["recommendations"] = recs
+
+    def _get(self) -> None:
+        self._get_main_container()
+
+
 class FetchEpisodes(BaseFetch):
     def __init__(self, soup, query, code, ok):
         super().__init__(soup, query, code, ok)
