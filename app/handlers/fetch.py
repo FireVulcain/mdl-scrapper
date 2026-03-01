@@ -785,7 +785,11 @@ class FetchTopShows(BaseFetch):
             img_alt = ""
             if img_tag:
                 img_url = img_tag.get("data-src") or img_tag.get("src", "")
-                img_url = img_url.replace("_4s.", "_4f.")
+                base, _, qs = img_url.partition("?")
+                if "_4s." in base:
+                    img_url = base.replace("_4s.", "_4f.") + ("?" + qs if qs else "")
+                elif base.endswith("s.jpg"):
+                    img_url = base[:-5] + "c.jpg" + ("?" + qs if qs else "")
                 img_alt = img_tag.get("alt", "")
 
             # Slug / URL
