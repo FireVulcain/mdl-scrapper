@@ -111,7 +111,13 @@ async def lists(list_id: str, response: Response) -> Dict[str, Any]:
 
 _TOP_COUNTRY_CODES: Dict[str, int] = {
     "korean": 3,
+    "japanese": 1,
     "chinese": 2,
+    "taiwanese": 5,
+    "hongkong": 4,
+    "thai": 6,
+    "philippine": 140,
+    "singaporean": 157,
 }
 
 _TOP_STATUS_CODES: Dict[str, int] = {
@@ -121,6 +127,53 @@ _TOP_STATUS_CODES: Dict[str, int] = {
 }
 
 _TOP_SORT_VALUES = {"top", "popular"}
+
+_TOP_GENRE_CODES: Dict[str, int] = {
+    "action": 1,
+    "adventure": 5,
+    "animals": 9,
+    "business": 13,
+    "comedy": 17,
+    "crime": 21,
+    "detective": 38,
+    "documentary": 35,
+    "drama": 25,
+    "family": 29,
+    "fantasy": 32,
+    "food": 2,
+    "friendship": 6,
+    "historical": 10,
+    "horror": 14,
+    "investigation": 42,
+    "law": 18,
+    "life": 22,
+    "manga": 44,
+    "martial_arts": 26,
+    "mature": 40,
+    "medical": 30,
+    "melodrama": 33,
+    "military": 3,
+    "music": 7,
+    "mystery": 11,
+    "political": 41,
+    "psychological": 15,
+    "romance": 19,
+    "school": 23,
+    "sci_fi": 27,
+    "sitcom": 36,
+    "sports": 31,
+    "supernatural": 34,
+    "suspense": 4,
+    "thriller": 8,
+    "tokusatsu": 12,
+    "tragedy": 39,
+    "vampire": 16,
+    "war": 37,
+    "western": 45,
+    "wuxia": 20,
+    "youth": 24,
+    "zombies": 28,
+}
 
 
 def _validate_top_filters(
@@ -147,18 +200,72 @@ def _validate_top_filters(
     return st, so, None
 
 
+def _resolve_genres(genre: str | None, response: Response) -> tuple[str | None, dict | None]:
+    """Parse a comma-separated genre string into a MDL ge= value. Returns (ge_value, error)."""
+    if not genre:
+        return None, None
+
+    ids = []
+    for raw in genre.split(","):
+        key = raw.strip().lower().replace(" ", "_").replace("-", "_")
+        gid = _TOP_GENRE_CODES.get(key)
+        if gid is None:
+            response.status_code = 400
+            return None, {
+                "error": True,
+                "code": 400,
+                "description": f"Unknown genre '{raw.strip()}'. Supported values: {', '.join(_TOP_GENRE_CODES)}.",
+            }
+        ids.append(str(gid))
+
+    return ",".join(ids), None
+
+
+def _build_top_query(
+    co: int | None,
+    st: int,
+    so: str,
+    page: int,
+    ge: str | None,
+    year_from: int | None,
+    year_to: int | None,
+    rating_min: float | None,
+    rating_max: float | None,
+) -> str:
+    q = "search?adv=titles&ty=68"
+    if co is not None:
+        q += f"&co={co}"
+    if ge:
+        q += f"&ge={ge}"
+    if year_from is not None or year_to is not None:
+        q += f"&re={year_from or 1890},{year_to or 2026}"
+    if rating_min is not None or rating_max is not None:
+        q += f"&rt={rating_min or 0},{rating_max or 10}"
+    q += f"&st={st}&so={so}&page={page}"
+    return q
+
+
 @app.get("/top")
 async def fetch_top_all(
     response: Response,
     page: int = 1,
     status: str = "completed",
     sort: str = "top",
+    genre: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    rating_min: float | None = None,
+    rating_max: float | None = None,
 ) -> Dict[str, Any]:
     st, so, err = _validate_top_filters(status, sort, response)
     if err:
         return err
 
-    query = f"search?adv=titles&ty=68&st={st}&so={so}&page={page}"
+    ge, err = _resolve_genres(genre, response)
+    if err:
+        return err
+
+    query = _build_top_query(None, st, so, page, ge, year_from, year_to, rating_min, rating_max)
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
@@ -172,6 +279,11 @@ async def fetch_top(
     page: int = 1,
     status: str = "completed",
     sort: str = "top",
+    genre: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    rating_min: float | None = None,
+    rating_max: float | None = None,
 ) -> Dict[str, Any]:
     co = _TOP_COUNTRY_CODES.get(country.lower())
     if co is None:
@@ -186,7 +298,11 @@ async def fetch_top(
     if err:
         return err
 
-    query = f"search?adv=titles&ty=68&co={co}&st={st}&so={so}&page={page}"
+    ge, err = _resolve_genres(genre, response)
+    if err:
+        return err
+
+    query = _build_top_query(co, st, so, page, ge, year_from, year_to, rating_min, rating_max)
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
