@@ -109,6 +109,30 @@ async def lists(list_id: str, response: Response) -> Dict[str, Any]:
     return r
 
 
+_TOP_COUNTRY_CODES: Dict[str, int] = {
+    "korean": 3,
+    "chinese": 2,
+}
+
+
+@app.get("/top/{country}")
+async def fetch_top(country: str, response: Response, page: int = 1) -> Dict[str, Any]:
+    co = _TOP_COUNTRY_CODES.get(country.lower())
+    if co is None:
+        response.status_code = 400
+        return {
+            "error": True,
+            "code": 400,
+            "description": f"Unknown country '{country}'. Supported values: {', '.join(_TOP_COUNTRY_CODES)}.",
+        }
+
+    query = f"search?adv=titles&ty=68&co={co}&st=3&so=top&page={page}"
+    code, r = await fetch_func(query=query, t="top")
+
+    response.status_code = code
+    return r
+
+
 @app.get("/id/{drama_id}/threads")
 async def fetch_threads(
     drama_id: str,

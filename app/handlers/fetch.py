@@ -756,6 +756,128 @@ class FetchRecommendations(BaseFetch):
         self._get_main_container()
 
 
+class FetchTopShows(BaseFetch):
+    def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
+        super().__init__(soup, query, code, ok)
+
+    def _get_main_container(self) -> None:
+        if self.soup is None:
+            return
+
+        container = self.soup.find("div", class_="app-body")
+        if container is None:
+            return
+
+        shows: List[Dict[str, Any]] = []
+
+        for box in container.find_all("div", class_="box"):
+            box_id = box.get("id", "").replace("mdl-", "")
+            if not box_id.isdigit():
+                continue
+
+            box_body = box.find("div", class_="box-body")
+            if box_body is None:
+                continue
+
+            # Image (prefer data-src, fall back to src)
+            img_tag = box_body.find("img", class_="img-responsive")
+            img_url = ""
+            img_alt = ""
+            if img_tag:
+                img_url = img_tag.get("data-src") or img_tag.get("src", "")
+                img_url = img_url.replace("_4s.", "_4f.")
+                img_alt = img_tag.get("alt", "")
+
+            # Slug / URL
+            cover_link = box_body.find("a", class_="block")
+            slug = cover_link.get("href", "").strip() if cover_link else ""
+
+            # Rank
+            rank_tag = box_body.find("div", class_="ranking")
+            rank_raw = rank_tag.find("span").get_text(strip=True) if rank_tag else ""
+            try:
+                rank = int(rank_raw.lstrip("#"))
+            except ValueError:
+                rank = None
+
+            # Title
+            title_tag = box_body.find("h6", class_="title")
+            title = title_tag.find("a").get_text(strip=True) if title_tag else img_alt
+
+            # Details: "Korean Drama - 2025, 16 episodes"
+            details_tag = box_body.find("span", class_="text-muted")
+            details_text = details_tag.get_text(strip=True) if details_tag else ""
+            drama_type = year = ""
+            episodes: Any = None
+            if details_text:
+                parts = details_text.split(",")
+                type_year = parts[0].split("-")
+                drama_type = type_year[0].strip()
+                year = type_year[1].strip() if len(type_year) > 1 else ""
+                if len(parts) > 1:
+                    try:
+                        episodes = int(parts[1].replace("episodes", "").strip())
+                    except ValueError:
+                        pass
+
+            # Rating
+            rating_tag = box_body.find("span", class_="score")
+            rating: Any = None
+            if rating_tag:
+                rating = self._handle_rating(rating_tag)
+
+            # Synopsis (p that does NOT contain the rating span)
+            synopsis = ""
+            for p in box_body.find_all("p"):
+                if p.find("span", class_="score"):
+                    continue
+                synopsis = p.get_text(strip=True)
+                break
+
+            shows.append({
+                "id": box_id,
+                "title": title,
+                "original_title": img_alt if img_alt != title else "",
+                "url": slug,
+                "img": img_url,
+                "rank": rank,
+                "type": drama_type,
+                "year": year,
+                "episodes": episodes,
+                "rating": rating,
+                "synopsis": synopsis,
+            })
+
+        # Pagination
+        pagination: Dict[str, Any] = {}
+        pag_ul = container.find("ul", class_="pagination")
+        if pag_ul:
+            active = pag_ul.find("li", class_="active")
+            if active:
+                try:
+                    pagination["current_page"] = int(active.get_text(strip=True))
+                except ValueError:
+                    pass
+            last_link = pag_ul.find("li", class_="last")
+            if last_link:
+                last_a = last_link.find("a")
+                if last_a and last_a.get("href"):
+                    href = last_a["href"]
+                    import re as _re
+                    m = _re.search(r"page=(\d+)", href)
+                    if m:
+                        try:
+                            pagination["total_pages"] = int(m.group(1))
+                        except ValueError:
+                            pass
+
+        self.info["shows"] = shows
+        self.info["pagination"] = pagination
+
+    def _get(self) -> None:
+        self._get_main_container()
+
+
 class FetchEpisodes(BaseFetch):
     def __init__(self, soup, query, code, ok):
         super().__init__(soup, query, code, ok)

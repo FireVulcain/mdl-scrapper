@@ -10,6 +10,7 @@ from app.handlers.fetch import (
     FetchPerson,
     FetchRecommendations,
     FetchReviews,
+    FetchTopShows,
 )
 from app.handlers.search import Search
 
@@ -41,6 +42,7 @@ fs = {
     "cast": FetchCast,
     "reviews": FetchReviews,
     "recs": FetchRecommendations,
+    "top": FetchTopShows,
     "lists": FetchList,
     "dramalist": FetchDramaList,
     "episodes": FetchEpisodes,
