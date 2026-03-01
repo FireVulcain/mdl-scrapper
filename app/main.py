@@ -120,6 +120,8 @@ _TOP_STATUS_CODES: Dict[str, int] = {
     "completed": 3,
 }
 
+_TOP_SORT_VALUES = {"top", "popular"}
+
 
 @app.get("/top/{country}")
 async def fetch_top(
@@ -127,6 +129,7 @@ async def fetch_top(
     response: Response,
     page: int = 1,
     status: str = "completed",
+    sort: str = "top",
 ) -> Dict[str, Any]:
     co = _TOP_COUNTRY_CODES.get(country.lower())
     if co is None:
@@ -146,7 +149,16 @@ async def fetch_top(
             "description": f"Unknown status '{status}'. Supported values: {', '.join(_TOP_STATUS_CODES)}.",
         }
 
-    query = f"search?adv=titles&ty=68&co={co}&st={st}&so=top&page={page}"
+    so = sort.lower()
+    if so not in _TOP_SORT_VALUES:
+        response.status_code = 400
+        return {
+            "error": True,
+            "code": 400,
+            "description": f"Unknown sort '{sort}'. Supported values: {', '.join(_TOP_SORT_VALUES)}.",
+        }
+
+    query = f"search?adv=titles&ty=68&co={co}&st={st}&so={so}&page={page}"
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
