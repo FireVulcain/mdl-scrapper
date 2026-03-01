@@ -114,9 +114,20 @@ _TOP_COUNTRY_CODES: Dict[str, int] = {
     "chinese": 2,
 }
 
+_TOP_STATUS_CODES: Dict[str, int] = {
+    "ongoing": 1,
+    "upcoming": 2,
+    "completed": 3,
+}
+
 
 @app.get("/top/{country}")
-async def fetch_top(country: str, response: Response, page: int = 1) -> Dict[str, Any]:
+async def fetch_top(
+    country: str,
+    response: Response,
+    page: int = 1,
+    status: str = "completed",
+) -> Dict[str, Any]:
     co = _TOP_COUNTRY_CODES.get(country.lower())
     if co is None:
         response.status_code = 400
@@ -126,7 +137,16 @@ async def fetch_top(country: str, response: Response, page: int = 1) -> Dict[str
             "description": f"Unknown country '{country}'. Supported values: {', '.join(_TOP_COUNTRY_CODES)}.",
         }
 
-    query = f"search?adv=titles&ty=68&co={co}&st=3&so=top&page={page}"
+    st = _TOP_STATUS_CODES.get(status.lower())
+    if st is None:
+        response.status_code = 400
+        return {
+            "error": True,
+            "code": 400,
+            "description": f"Unknown status '{status}'. Supported values: {', '.join(_TOP_STATUS_CODES)}.",
+        }
+
+    query = f"search?adv=titles&ty=68&co={co}&st={st}&so=top&page={page}"
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
