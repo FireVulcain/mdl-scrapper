@@ -712,8 +712,70 @@ class FetchEpisode(BaseFetch):
                     self.info["air_date"] = li.get_text(strip=True).replace("Aired:", "").strip()
                     break
 
+    def _get_reviews(self) -> None:
+        if self.soup is None:
+            return
+
+        reviews_container = self.soup.find("div", class_="reviews")
+        if reviews_container is None:
+            self.info["reviews"] = []
+            return
+
+        reviews = []
+        for review in reviews_container.find_all("div", class_="review"):
+            r: Dict[str, Any] = {}
+
+            r["id"] = review.get("id", "").replace("review-", "")
+
+            header_info = review.find("div", class_="header-info")
+            if header_info:
+                author_tag = header_info.find("a", class_="text-primary")
+                if author_tag:
+                    r["author"] = author_tag.get_text(strip=True)
+                    r["author_url"] = urljoin(MYDRAMALIST_WEBSITE, author_tag.get("href", ""))
+
+            avatar = review.find("span", class_="avatar")
+            if avatar:
+                img = avatar.find("img")
+                r["author_avatar"] = img.get("src", "") if img else ""
+
+            user_stats = review.find("div", class_=re.compile(r"user-stats"))
+            if user_stats:
+                b = user_stats.find("b")
+                try:
+                    r["helpful_count"] = int(b.get_text(strip=True)) if b else 0
+                except ValueError:
+                    r["helpful_count"] = 0
+
+            date_tag = review.find("small", class_="datetime")
+            r["date"] = date_tag.get_text(strip=True) if date_tag else ""
+
+            rating_fill = review.find("span", class_="fill")
+            if rating_fill:
+                m = re.search(r"width:(\d+)%", rating_fill.get("style", ""))
+                if m:
+                    r["rating"] = int(m.group(1)) / 10
+
+            rating_panel = review.find("p", class_="rating-panel")
+            if rating_panel:
+                b = rating_panel.find("b")
+                r["headline"] = b.get_text(strip=True) if b else ""
+
+            body_container = review.find("div", class_=re.compile(r"review-body"))
+            if body_container:
+                for tag in body_container.find_all(["p", "div"], class_=["rating-panel", "review-helpful", "read-more"]):
+                    tag.decompose()
+                for br in body_container.find_all("br"):
+                    br.replace_with("\n")
+                r["body"] = body_container.get_text(strip=True)
+
+            reviews.append(r)
+
+        self.info["reviews"] = reviews
+
     def _get(self) -> None:
         self._get_main_container()
+        self._get_reviews()
 
 
 class FetchRecommendations(BaseFetch):
