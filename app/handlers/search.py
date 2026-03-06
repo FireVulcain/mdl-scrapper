@@ -130,6 +130,13 @@ class Search(BaseSearch):
                 # specific drama info
                 r["type"], r["year"], r["series"] = self._res_get_year_info(result)
 
+                # rating
+                score_elem = result.find("span", class_="score")
+                try:
+                    r["rating"] = float(score_elem.text.strip()) if score_elem and score_elem.text.strip() else None
+                except ValueError:
+                    r["rating"] = None
+
                 _dramas.append(r)
                 continue
 
