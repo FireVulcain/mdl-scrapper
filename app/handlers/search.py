@@ -110,10 +110,13 @@ class Search(BaseSearch):
             _thumb = str(result.find("img", class_="img-responsive")["data-src"]).split(
                 "/1280/"
             )
-            if len(_thumb) > 1:
-                r["thumb"] = _thumb[1]
-            else:
-                r["thumb"] = _thumb[0]
+            img_url = _thumb[1] if len(_thumb) > 1 else _thumb[0]
+            base, _, qs = img_url.partition("?")
+            if "_4s." in base:
+                img_url = base.replace("_4s.", "_4f.") + ("?" + qs if qs else "")
+            elif base.endswith("s.jpg"):
+                img_url = base[:-5] + "c.jpg" + ("?" + qs if qs else "")
+            r["thumb"] = img_url
 
             if result.has_attr("id"):
                 r["mdl_id"] = result["id"]
