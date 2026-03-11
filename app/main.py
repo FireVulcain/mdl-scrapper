@@ -231,12 +231,15 @@ def _build_top_query(
     year_to: int | None,
     rating_min: float | None,
     rating_max: float | None,
+    th: str | None = None,
 ) -> str:
     q = "search?adv=titles&ty=68"
     if co is not None:
         q += f"&co={co}"
     if ge:
         q += f"&ge={ge}"
+    if th:
+        q += f"&th={th}"
     if year_from is not None or year_to is not None:
         q += f"&re={year_from or 1890},{year_to or 2026}"
     if rating_min is not None or rating_max is not None:
@@ -256,6 +259,7 @@ async def fetch_top_all(
     year_to: int | None = None,
     rating_min: float | None = None,
     rating_max: float | None = None,
+    tag: str | None = None,
 ) -> Dict[str, Any]:
     st, so, err = _validate_top_filters(status, sort, response)
     if err:
@@ -265,7 +269,7 @@ async def fetch_top_all(
     if err:
         return err
 
-    query = _build_top_query(None, st, so, page, ge, year_from, year_to, rating_min, rating_max)
+    query = _build_top_query(None, st, so, page, ge, year_from, year_to, rating_min, rating_max, tag)
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
@@ -284,6 +288,7 @@ async def fetch_top(
     year_to: int | None = None,
     rating_min: float | None = None,
     rating_max: float | None = None,
+    tag: str | None = None,
 ) -> Dict[str, Any]:
     co = _TOP_COUNTRY_CODES.get(country.lower())
     if co is None:
@@ -302,7 +307,7 @@ async def fetch_top(
     if err:
         return err
 
-    query = _build_top_query(co, st, so, page, ge, year_from, year_to, rating_min, rating_max)
+    query = _build_top_query(co, st, so, page, ge, year_from, year_to, rating_min, rating_max, tag)
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
