@@ -117,12 +117,24 @@ class FetchDrama(BaseFetch):
             for i in all_others:
                 # get each li from <ul>
                 _title = i.find("b").text.strip()
-                self.info["others"][
-                    _title.replace(":", "").replace(" ", "_").lower()
-                ] = [
-                    i.strip()
-                    for i in i.text.replace(_title + " ", "").strip().split(", ")
-                ]
+                _key = _title.replace(":", "").replace(" ", "_").lower()
+
+                if _key == "tags":
+                    tags = []
+                    for a in i.find_all("a"):
+                        href = a.get("href", "")
+                        # href is like /tag/370-enemies-to-lovers
+                        tag_id = None
+                        m = re.match(r"/tag/(\d+)", href)
+                        if m:
+                            tag_id = int(m.group(1))
+                        tags.append({"id": tag_id, "name": a.get_text(strip=True)})
+                    self.info["others"][_key] = tags
+                else:
+                    self.info["others"][_key] = [
+                        i.strip()
+                        for i in i.text.replace(_title + " ", "").strip().split(", ")
+                    ]
 
         except Exception:
             # there was a problem while trying to parse
