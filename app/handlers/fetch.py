@@ -121,11 +121,11 @@ class FetchDrama(BaseFetch):
 
                 if _key == "tags":
                     tags = []
-                    for a in i.find_all("a"):
+                    for a in i.find_all("a", class_="text-primary"):
                         href = a.get("href", "")
-                        # href is like /tag/370-enemies-to-lovers
+                        # href is like /search?adv=titles&th=691&so=popular&or=desc
                         tag_id = None
-                        m = re.match(r"/tag/(\d+)", href)
+                        m = re.search(r"[?&]th=(\d+)", href)
                         if m:
                             tag_id = int(m.group(1))
                         tags.append({"id": tag_id, "name": a.get_text(strip=True)})
