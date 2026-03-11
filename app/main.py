@@ -309,6 +309,17 @@ async def fetch_top(
     return r
 
 
+@app.get("/tags/search")
+async def tags_search(q: str, response: Response) -> Any:
+    client = cloudscraper.create_scraper()
+    resp = client.get(
+        "https://mydramalist.com/v1/tags/search",
+        params={"lang": "en-US", "q": q, "approved": "true"},
+    )
+    response.status_code = resp.status_code
+    return resp.json()
+
+
 @app.get("/id/{drama_id}/threads")
 async def fetch_threads(
     drama_id: str,
