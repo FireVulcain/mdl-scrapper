@@ -200,25 +200,43 @@ def _validate_top_filters(
     return st, so, None
 
 
-def _resolve_genres(genre: str | None, response: Response) -> tuple[str | None, dict | None]:
-    """Parse a comma-separated genre string into a MDL ge= value. Returns (ge_value, error)."""
-    if not genre:
-        return None, None
-
+def _resolve_genres(
+    genre: str | None, genre_exclude: str | None, response: Response
+) -> tuple[str | None, dict | None]:
+    """Parse comma-separated include/exclude genre strings into a MDL ge= value. Returns (ge_value, error)."""
     ids = []
-    for raw in genre.split(","):
-        key = raw.strip().lower().replace(" ", "_").replace("-", "_")
+
+    for raw in (genre or "").split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        key = raw.lower().replace(" ", "_").replace("-", "_")
         gid = _TOP_GENRE_CODES.get(key)
         if gid is None:
             response.status_code = 400
             return None, {
                 "error": True,
                 "code": 400,
-                "description": f"Unknown genre '{raw.strip()}'. Supported values: {', '.join(_TOP_GENRE_CODES)}.",
+                "description": f"Unknown genre '{raw}'. Supported values: {', '.join(_TOP_GENRE_CODES)}.",
             }
         ids.append(str(gid))
 
-    return ",".join(ids), None
+    for raw in (genre_exclude or "").split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        key = raw.lower().replace(" ", "_").replace("-", "_")
+        gid = _TOP_GENRE_CODES.get(key)
+        if gid is None:
+            response.status_code = 400
+            return None, {
+                "error": True,
+                "code": 400,
+                "description": f"Unknown genre '{raw}'. Supported values: {', '.join(_TOP_GENRE_CODES)}.",
+            }
+        ids.append(f"-{gid}")
+
+    return ",".join(ids) if ids else None, None
 
 
 def _build_top_query(
@@ -232,14 +250,21 @@ def _build_top_query(
     rating_min: float | None,
     rating_max: float | None,
     th: str | None = None,
+    th_exclude: str | None = None,
 ) -> str:
+    th_parts = [t.strip() for t in (th or "").split(",") if t.strip()]
+    for tid in (th_exclude or "").split(","):
+        tid = tid.strip()
+        if tid:
+            th_parts.append(f"-{tid}")
+
     q = "search?adv=titles&ty=68"
     if co is not None:
         q += f"&co={co}"
     if ge:
         q += f"&ge={ge}"
-    if th:
-        q += f"&th={th}"
+    if th_parts:
+        q += f"&th={','.join(th_parts)}"
     if year_from is not None or year_to is not None:
         q += f"&re={year_from or 1890},{year_to or 2026}"
     if rating_min is not None or rating_max is not None:
@@ -255,21 +280,23 @@ async def fetch_top_all(
     status: str = "completed",
     sort: str = "top",
     genre: str | None = None,
+    genre_exclude: str | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
     rating_min: float | None = None,
     rating_max: float | None = None,
     tag: str | None = None,
+    tag_exclude: str | None = None,
 ) -> Dict[str, Any]:
     st, so, err = _validate_top_filters(status, sort, response)
     if err:
         return err
 
-    ge, err = _resolve_genres(genre, response)
+    ge, err = _resolve_genres(genre, genre_exclude, response)
     if err:
         return err
 
-    query = _build_top_query(None, st, so, page, ge, year_from, year_to, rating_min, rating_max, tag)
+    query = _build_top_query(None, st, so, page, ge, year_from, year_to, rating_min, rating_max, tag, tag_exclude)
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
@@ -284,11 +311,13 @@ async def fetch_top(
     status: str = "completed",
     sort: str = "top",
     genre: str | None = None,
+    genre_exclude: str | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
     rating_min: float | None = None,
     rating_max: float | None = None,
     tag: str | None = None,
+    tag_exclude: str | None = None,
 ) -> Dict[str, Any]:
     co = _TOP_COUNTRY_CODES.get(country.lower())
     if co is None:
@@ -303,11 +332,11 @@ async def fetch_top(
     if err:
         return err
 
-    ge, err = _resolve_genres(genre, response)
+    ge, err = _resolve_genres(genre, genre_exclude, response)
     if err:
         return err
 
-    query = _build_top_query(co, st, so, page, ge, year_from, year_to, rating_min, rating_max, tag)
+    query = _build_top_query(co, st, so, page, ge, year_from, year_to, rating_min, rating_max, tag, tag_exclude)
     code, r = await fetch_func(query=query, t="top")
 
     response.status_code = code
