@@ -1,7 +1,9 @@
 import json
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 
@@ -42,11 +44,9 @@ class FetchDrama(BaseFetch):
 
             # Split the string by the separator '‧'
             parts = sub_title.split("‧")
-            print(parts)
 
             # The year is the last part, remove any leading/trailing whitespace
             year_str = parts[-1].strip()
-            print(year_str)
 
             # Year could be a range, so we keep it as a string
             self.info["year"] = year_str.strip()
@@ -90,6 +90,21 @@ class FetchDrama(BaseFetch):
                 match = re.search(r"var nextEpisodeAiring = ({.*});", script.string)
                 if match:
                     next_airing = json.loads(match.group(1))
+
+                    # released_at is a unix timestamp; expose it as readable dates
+                    try:
+                        released_at = int(next_airing.get("released_at", 0))
+                        if released_at:
+                            utc_dt = datetime.fromtimestamp(released_at, tz=timezone.utc)
+                            next_airing["air_date"] = utc_dt.isoformat()
+
+                            tz_name = next_airing.get("timezone")
+                            if tz_name:
+                                local_dt = utc_dt.astimezone(ZoneInfo(tz_name))
+                                next_airing["air_date_local"] = local_dt.isoformat()
+                    except Exception:
+                        pass
+
                     self.info["next_episode_airing"] = next_airing
                     current_episode = float(next_airing["episode_number"]) - 1
                     self.info["current_episode"] = (
