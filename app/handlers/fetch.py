@@ -201,65 +201,83 @@ class FetchPerson(BaseFetch):
         # WORKS
         self.info["works"] = {}
 
-        # container
-        _works_container = container.find("div", class_="col-lg-8 col-md-8").find_all(
+        # container: the box holding the filmography tables, its position among
+        # the sibling boxes varies (a `Photos` box may come first)
+        _works_container = None
+        for box_body in container.find("div", class_="col-lg-8 col-md-8").find_all(
             "div", class_="box-body"
-        )[1]
+        ):
+            if box_body.find("table", class_="film-list") is not None:
+                _works_container = box_body
+                break
 
-        # get all headers
-        _work_headers = [i.text.strip() for i in _works_container.find_all("h5")]
-        _work_tables = _works_container.find_all("table")
+        if _works_container is None:
+            return
+
+        # each table is preceded by the <h5> naming its category
+        _work_tables = _works_container.find_all("table", class_="film-list")
+        _work_headers = []
+        for k in _work_tables:
+            header = k.find_previous("h5")
+            _work_headers.append(header.text.strip() if header else "")
 
         for j, k in zip(_work_headers, _work_tables, strict=False):
             # theaders = ['episodes' if i.text.strip() == '#' else i.text.strip() for i in k.find("thead").find_all("th")]
-            bare_works: List[Dict[str, Any]] = []
+            self.info["works"][j] = [
+                self._parse_work_row(i, j) for i in k.find("tbody").find_all("tr")
+            ]
 
-            for i in k.find("tbody").find_all("tr"):
-                _raw_year = i.find("td", class_="year").text
-                _raw_title = i.find("td", class_="title").find("a")
+    def _parse_work_row(self, i: BeautifulSoup, category: str) -> Dict[str, Any]:
+        _raw_year = i.find("td", class_="year").text
+        _title_cell = i.find("td", class_="title")
 
-                r = {
-                    "_slug": i["class"][0],
-                    "year": _raw_year if _raw_year == "TBA" else int(_raw_year),
-                    "title": {
-                        "link": urljoin(MYDRAMALIST_WEBSITE, _raw_title["href"]),
-                        "name": _raw_title.text,
-                    },
-                    "rating": self._handle_rating(
-                        i.find("td", class_="text-center").find(class_="text-sm")
-                    ),
+        # the first <a> is the thumbnail (no text); the title sits in <b>
+        _title_bold = _title_cell.find("b")
+        _raw_title = _title_bold.find("a") if _title_bold else None
+        if _raw_title is None:
+            _raw_title = _title_cell.find("a")
+
+        r: Dict[str, Any] = {
+            "_slug": i["class"][0],
+            "year": _raw_year if _raw_year == "TBA" else int(_raw_year),
+            "title": {
+                "link": urljoin(MYDRAMALIST_WEBSITE, _raw_title["href"]),
+                "name": _raw_title.get_text(strip=True) or _raw_title.get("title", ""),
+            },
+            "rating": self._handle_rating(
+                i.find("td", class_="text-center").find(class_="text-sm")
+            ),
+        }
+
+        _raw_role = i.find("td", class_="role")
+
+        # applicable only on dramas / tv-shows (this is different for non-actors)
+        try:
+            _raw_role_name = _raw_role.find("div", class_="name").text.strip()
+        except Exception:
+            _raw_role_name = None
+
+        # use `type` for non-dramas, etc while `role` otherwise.
+        # staff credits (screenwriter, producer, ...) carry no character name at
+        # all, so their `roleid` holds the work type instead
+        try:
+            if category.lower() in FetchPerson.non_actors or _raw_role_name is None:
+                r["type"] = _raw_role.find(class_="roleid").text.strip()
+            else:
+                r["role"] = {
+                    "name": _raw_role_name,
+                    "type": _raw_role.find("div", class_="roleid").text.strip(),
                 }
+        except Exception:
+            pass
 
-                _raw_role = i.find("td", class_="role")
+        # not applicable for movies
+        try:
+            r["episodes"] = int(i.find("td", class_="episodes").text)
+        except Exception:
+            pass
 
-                # applicable only on dramas / tv-shows (this is different for non-actors)
-                try:
-                    _raw_role_name = _raw_role.find("div", class_="name").text.strip()
-                except Exception:
-                    _raw_role_name = None
-
-                # use `type` for non-dramas, etc while `role` otherwise
-                try:
-                    if j in FetchPerson.non_actors:
-                        r["type"] = _raw_role.find(class_="roleid").text.strip()
-                    else:
-                        r["role"] = {
-                            "name": _raw_role_name,
-                            "type": _raw_role.find("div", class_="roleid").text.strip(),
-                        }
-                except Exception:
-                    pass
-
-                # not applicable for movies
-                try:
-                    episodes = i.find("td", class_="episodes").text
-                    r["episodes"] = int(episodes)
-                except Exception:
-                    pass
-
-                bare_works.append(r)
-
-            self.info["works"][j] = bare_works
+        return r
 
     def _get(self) -> None:
         self._get_main_container()
