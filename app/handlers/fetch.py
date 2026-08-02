@@ -223,9 +223,12 @@ class FetchPerson(BaseFetch):
 
         for j, k in zip(_work_headers, _work_tables, strict=False):
             # theaders = ['episodes' if i.text.strip() == '#' else i.text.strip() for i in k.find("thead").find_all("th")]
-            self.info["works"][j] = [
+            # a category can be split across several tables (e.g. two `Drama`
+            # tables), so accumulate rows instead of overwriting the key
+            rows = [
                 self._parse_work_row(i, j) for i in k.find("tbody").find_all("tr")
             ]
+            self.info["works"].setdefault(j, []).extend(rows)
 
     def _parse_work_row(self, i: BeautifulSoup, category: str) -> Dict[str, Any]:
         _raw_year = i.find("td", class_="year").text
