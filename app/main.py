@@ -93,6 +93,36 @@ async def person(person_id: str, response: Response) -> Dict[str, Any]:
     return r
 
 
+@app.get("/people/{person_id}/threads")
+async def fetch_person_threads(
+    person_id: str,
+    response: Response,
+    page: int = 1,
+    limit: int = 50,
+    sort: str = "recent",
+    after: int | None = None,
+) -> Any:
+    # extract numeric id from slug (e.g. "15612-hu-yi-tian" -> "15612")
+    numeric_id = person_id.split("-")[0]
+
+    params: Dict[str, Any] = {
+        "t": numeric_id,
+        "c": "actor",
+        "limit": limit,
+        "page": page,
+        "sort": sort,
+        "lang": "en-US",
+    }
+    if after is not None:
+        params["after"] = after
+
+    client = cloudscraper.create_scraper()
+    resp = client.get("https://mydramalist.com/v1/threads", params=params)
+
+    response.status_code = resp.status_code
+    return resp.json()
+
+
 @app.get("/dramalist/{user_id}")
 async def dramalist(user_id: str, response: Response) -> Dict[str, Any]:
     code, r = await fetch_func(query=f"dramalist/{user_id}", t="dramalist")
