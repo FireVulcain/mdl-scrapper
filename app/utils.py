@@ -8,6 +8,7 @@ from app.handlers.fetch import (
     FetchEpisodes,
     FetchList,
     FetchPerson,
+    FetchPersonPhotos,
     FetchRecommendations,
     FetchReviews,
     FetchTopShows,
@@ -39,6 +40,7 @@ async def search_func(query: str) -> Tuple[int, Dict[str, Any]]:
 fs = {
     "drama": FetchDrama,
     "person": FetchPerson,
+    "person_photos": FetchPersonPhotos,
     "cast": FetchCast,
     "reviews": FetchReviews,
     "recs": FetchRecommendations,

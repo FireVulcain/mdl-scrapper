@@ -93,6 +93,18 @@ async def person(person_id: str, response: Response) -> Dict[str, Any]:
     return r
 
 
+@app.get("/people/{person_id}/photos")
+async def person_photos(
+    person_id: str, response: Response, page: int = 1
+) -> Dict[str, Any]:
+    code, r = await fetch_func(
+        query=f"people/{person_id}/photos?page={page}", t="person_photos"
+    )
+
+    response.status_code = code
+    return r
+
+
 @app.get("/people/{person_id}/threads")
 async def fetch_person_threads(
     person_id: str,

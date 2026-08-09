@@ -1060,3 +1060,74 @@ class FetchEpisodes(BaseFetch):
 
     def _get(self):
         self._get_main_container()
+
+
+class FetchPersonPhotos(BaseFetch):
+    def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
+        super().__init__(soup, query, code, ok)
+
+    def _get_main_container(self) -> None:
+        if self.soup is None:
+            return
+
+        container = self.soup.find("div", class_="app-body")
+        if container is None:
+            return
+
+        photos: List[Dict[str, Any]] = []
+        # the photos page has no film-title heading; the person name only
+        # appears in each image's `alt`, so capture it from the first photo
+        name = ""
+        for a in container.find_all("a", class_="block", href=True):
+            href = a["href"].strip()
+            if not href.startswith("/photos/"):
+                continue
+
+            img = a.find("img")
+            image = img.get("src", "") if img else ""
+            if not name and img:
+                name = img.get("alt", "").strip()
+
+            photos.append(
+                {
+                    "id": href.split("/")[-1],
+                    "link": urljoin(MYDRAMALIST_WEBSITE, href),
+                    "image": image,
+                }
+            )
+
+        self.info["title"] = name
+        self.info["photos"] = photos
+        self.info["pagination"] = self._parse_pagination(container)
+
+    def _parse_pagination(self, container: BeautifulSoup) -> Dict[str, Any]:
+        pagination: Dict[str, Any] = {}
+
+        pag_ul = container.find("ul", class_="pagination")
+        if pag_ul is None:
+            return pagination
+
+        active = pag_ul.find("li", class_="active")
+        if active:
+            try:
+                pagination["current_page"] = int(active.get_text(strip=True))
+            except ValueError:
+                pass
+
+        # only the `last` link reliably carries the total page count
+        last_link = pag_ul.find("li", class_="last")
+        if last_link:
+            a = last_link.find("a")
+            href = a.get("href", "") if a else ""
+            m = re.search(r"page=(\d+)", href)
+            if m:
+                pagination["total_pages"] = int(m.group(1))
+
+        # single-page galleries expose no pagination controls
+        pagination.setdefault("current_page", 1)
+        pagination.setdefault("total_pages", pagination["current_page"])
+
+        return pagination
+
+    def _get(self) -> None:
+        self._get_main_container()
