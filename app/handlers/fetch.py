@@ -1088,11 +1088,17 @@ class FetchPersonPhotos(BaseFetch):
             if not name and img:
                 name = img.get("alt", "").strip()
 
+            # thumbnails end with `m.jpg`; the full-size variant uses `f.jpg`
+            image_full = image
+            if image.endswith("m.jpg"):
+                image_full = image[:-5] + "f.jpg"
+
             photos.append(
                 {
                     "id": href.split("/")[-1],
                     "link": urljoin(MYDRAMALIST_WEBSITE, href),
                     "image": image,
+                    "image_full": image_full,
                 }
             )
 
