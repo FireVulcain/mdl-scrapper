@@ -240,12 +240,28 @@ class FetchPerson(BaseFetch):
         if _raw_title is None:
             _raw_title = _title_cell.find("a")
 
+        # poster url ends with a size code before `.jpg` (`t` is the tiny
+        # thumbnail); serve `c` as the default and `f` (full) as a fallback
+        _thumb = _title_cell.find("img")
+        image = ""
+        image_full = ""
+        if _thumb:
+            _raw_img = _thumb.get("src") or _thumb.get("data-src", "")
+            if _raw_img.endswith("t.jpg"):
+                image = _raw_img[:-5] + "c.jpg"
+                image_full = _raw_img[:-5] + "f.jpg"
+            else:
+                image = _raw_img
+                image_full = _raw_img
+
         r: Dict[str, Any] = {
             "_slug": i["class"][0],
             "year": _raw_year if _raw_year == "TBA" else int(_raw_year),
             "title": {
                 "link": urljoin(MYDRAMALIST_WEBSITE, _raw_title["href"]),
                 "name": _raw_title.get_text(strip=True) or _raw_title.get("title", ""),
+                "image": image,
+                "image_full": image_full,
             },
             "rating": self._handle_rating(
                 i.find("td", class_="text-center").find(class_="text-sm")
