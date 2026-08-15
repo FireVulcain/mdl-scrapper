@@ -1078,7 +1078,9 @@ class FetchEpisodes(BaseFetch):
         self._get_main_container()
 
 
-class FetchPersonPhotos(BaseFetch):
+class FetchPhotos(BaseFetch):
+    """Scrapes a photo gallery (drama or person)."""
+
     def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
         super().__init__(soup, query, code, ok)
 
@@ -1091,9 +1093,9 @@ class FetchPersonPhotos(BaseFetch):
             return
 
         photos: List[Dict[str, Any]] = []
-        # the photos page has no film-title heading; the person name only
-        # appears in each image's `alt`, so capture it from the first photo
-        name = ""
+        # the person photos page has no film-title heading, so fall back to the
+        # name carried by each image's `alt`
+        alt_name = ""
         for a in container.find_all("a", class_="block", href=True):
             href = a["href"].strip()
             if not href.startswith("/photos/"):
@@ -1101,8 +1103,8 @@ class FetchPersonPhotos(BaseFetch):
 
             img = a.find("img")
             image = img.get("src", "") if img else ""
-            if not name and img:
-                name = img.get("alt", "").strip()
+            if not alt_name and img:
+                alt_name = img.get("alt", "").strip()
 
             # thumbnails end with `m.jpg`; the full-size variant uses `f.jpg`
             image_full = image
@@ -1118,7 +1120,10 @@ class FetchPersonPhotos(BaseFetch):
                 }
             )
 
-        self.info["title"] = name
+        title_tag = container.find("h1", class_="film-title")
+        self.info["title"] = (
+            title_tag.get_text(strip=True) if title_tag else alt_name
+        )
         self.info["photos"] = photos
         self.info["pagination"] = self._parse_pagination(container)
 

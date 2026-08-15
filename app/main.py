@@ -67,6 +67,16 @@ async def fetch_episode(drama_id: str, episode_number: int, response: Response) 
     return r
 
 
+@app.get("/id/{drama_id}/photos")
+async def fetch_drama_photos(
+    drama_id: str, response: Response, page: int = 1
+) -> Dict[str, Any]:
+    code, r = await fetch_func(query=f"{drama_id}/photos?page={page}", t="photos")
+
+    response.status_code = code
+    return r
+
+
 @app.get("/id/{drama_id}/recs")
 async def fetch_recs(drama_id: str, response: Response) -> Dict[str, Any]:
     code, r = await fetch_func(query=f"{drama_id}/recs", t="recs")
@@ -98,7 +108,7 @@ async def person_photos(
     person_id: str, response: Response, page: int = 1
 ) -> Dict[str, Any]:
     code, r = await fetch_func(
-        query=f"people/{person_id}/photos?page={page}", t="person_photos"
+        query=f"people/{person_id}/photos?page={page}", t="photos"
     )
 
     response.status_code = code
