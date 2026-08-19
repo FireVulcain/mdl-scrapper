@@ -598,6 +598,7 @@ class FetchDramaList(BaseFetch):
 
     def _parse_msv2_table(self, table: BeautifulSoup) -> Dict[str, Any]:
         grouped: Dict[str, List[Dict[str, str]]] = {}
+        seen_ids: set = set()
 
         for row in table.find_all("tr"):
             title_el = row.find("td", class_="msv2-i-title")
@@ -609,15 +610,44 @@ class FetchDramaList(BaseFetch):
             if link is None:
                 continue
 
+            # MDL's paginated fragments can overlap between pages (unstable
+            # sort on ties), so dedupe on the drama id.
+            drama_id = link.get("href", "").split("/")[-1]
+            if not drama_id or drama_id in seen_ids:
+                continue
+            seen_ids.add(drama_id)
+
             score_el = row.find("td", class_="msv2-i-score")
             eps_el = row.find("td", class_="msv2-i-eps")
             progress_el = row.find("td", class_="msv2-i-progress")
 
             episode_seen = ""
+            episode_total = ""
             if progress_el is not None:
-                match = re.search(r"(\d+)\s*/\s*\d+", progress_el.get_text())
-                if match:
-                    episode_seen = match.group(1)
+                seen_span = progress_el.find("span", class_="num-seen")
+                total_span = progress_el.find("span", class_="num-total")
+                if seen_span is not None:
+                    episode_seen = seen_span.get_text(strip=True)
+                if total_span is not None:
+                    episode_total = total_span.get_text(strip=True)
+
+                if not episode_seen or not episode_total:
+                    match = re.search(r"(\d+)\s*/\s*(\d+)", progress_el.get_text())
+                    if match:
+                        episode_seen = episode_seen or match.group(1)
+                        episode_total = episode_total or match.group(2)
+
+            if not episode_total and eps_el is not None:
+                episode_total = eps_el.get_text(strip=True)
+
+            score = ""
+            if score_el is not None:
+                score_span = score_el.find("span", class_="score")
+                score = (
+                    score_span.get_text(strip=True)
+                    if score_span is not None
+                    else score_el.get_text(strip=True)
+                )
 
             status_raw = status_el.get_text(strip=True)
             status_label = self._MSV2_STATUS_LABELS.get(
@@ -626,12 +656,10 @@ class FetchDramaList(BaseFetch):
 
             parsed_item = {
                 "name": link.get_text(strip=True),
-                "id": link.get("href", "").split("/")[-1],
-                "score": score_el.get_text(strip=True) if score_el is not None else "",
+                "id": drama_id,
+                "score": score,
                 "episode_seen": episode_seen,
-                "episode_total": eps_el.get_text(strip=True)
-                if eps_el is not None
-                else "",
+                "episode_total": episode_total,
             }
 
             grouped.setdefault(status_label, []).append(parsed_item)
