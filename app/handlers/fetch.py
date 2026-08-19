@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
+import cloudscraper
 from bs4 import BeautifulSoup
 
 from app import MYDRAMALIST_WEBSITE
@@ -489,26 +490,159 @@ class FetchReviews(BaseFetch):
 
 
 class FetchDramaList(BaseFetch):
+    # msv2 status column -> label used by the classic layout, kept for consistency
+    _MSV2_STATUS_LABELS = {
+        "watching": "Currently Watching",
+        "completed": "Completed",
+        "on hold": "On Hold",
+        "plan to watch": "Plan to Watch",
+        "dropped": "Dropped",
+    }
+
+    # msv2 lazy-loads 100 rows per page, cap the loop as a safety net
+    _MSV2_MAX_PAGES = 100
+
     def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
         super().__init__(soup, query, code, ok)
+
+    @classmethod
+    async def scrape(cls, query: str, t: str) -> "FetchDramaList":
+        obj: "FetchDramaList" = await super().scrape(query=query, t=t)
+
+        if obj.ok and obj.soup is not None:
+            if obj.soup.find("table", class_="msv2-table") is not None:
+                await obj._fetch_msv2_pages()
+
+        return obj
+
+    async def _fetch_msv2_pages(self) -> None:
+        if self.soup is None:
+            return
+
+        table = self.soup.find("table", class_="msv2-table")
+        if table is None:
+            return
+
+        tbody = table.find("tbody") or table
+        url = urljoin(MYDRAMALIST_WEBSITE, self.query)
+        client = cloudscraper.create_scraper()
+
+        page = 2
+        while page <= self._MSV2_MAX_PAGES:
+            try:
+                resp = client.post(
+                    url,
+                    headers={
+                        **self.headers,
+                        "x-requested-with": "XMLHttpRequest",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "page": page,
+                        "sort_by": "title",
+                        "sort_order": "asc",
+                        "filters": {
+                            "search": "",
+                            "list": "0",
+                            "country": "",
+                            "type": "",
+                            "category": "",
+                            "tags": [],
+                            "genres": [],
+                        },
+                        "settings": {},
+                        "layout": {},
+                        "roll_dice": None,
+                    },
+                )
+            except Exception:
+                break
+
+            if resp.status_code != 200 or not resp.text.strip():
+                break
+
+            fragment = BeautifulSoup(resp.text, "html.parser")
+            rows = fragment.find_all("tr")
+            if not rows:
+                break
+
+            for row in rows:
+                tbody.append(row)
+
+            limit = int(resp.headers.get("x-pagination-limit", len(rows) or 100))
+            if len(rows) < limit:
+                break
+
+            page += 1
 
     def _get_main_container(self) -> None:
         if self.soup is None:
             return
 
         container = self.soup.find_all("div", class_="mdl-style-list")
-        if container is None:
+        if container:
+            titles = [self._parse_title(item) for item in container]
+            dramas = [self._parse_drama(item) for item in container]
+            stats = [self._parse_total_stats(item) for item in container]
+
+            items = {}
+            for title, drama, stat in zip(titles, dramas, stats, strict=False):
+                items[title] = {"items": drama, "stats": stat}
+
+            self.info["list"] = items
             return
 
-        titles = [self._parse_title(item) for item in container]
-        dramas = [self._parse_drama(item) for item in container]
-        stats = [self._parse_total_stats(item) for item in container]
+        msv2_table = self.soup.find("table", class_="msv2-table")
+        if msv2_table is not None:
+            self.info["list"] = self._parse_msv2_table(msv2_table)
 
-        items = {}
-        for title, drama, stat in zip(titles, dramas, stats, strict=False):
-            items[title] = {"items": drama, "stats": stat}
+    def _parse_msv2_table(self, table: BeautifulSoup) -> Dict[str, Any]:
+        grouped: Dict[str, List[Dict[str, str]]] = {}
 
-        self.info["list"] = items
+        for row in table.find_all("tr"):
+            title_el = row.find("td", class_="msv2-i-title")
+            status_el = row.find("td", class_="msv2-i-status")
+            if title_el is None or status_el is None:
+                continue
+
+            link = title_el.find("a")
+            if link is None:
+                continue
+
+            score_el = row.find("td", class_="msv2-i-score")
+            eps_el = row.find("td", class_="msv2-i-eps")
+            progress_el = row.find("td", class_="msv2-i-progress")
+
+            episode_seen = ""
+            if progress_el is not None:
+                match = re.search(r"(\d+)\s*/\s*\d+", progress_el.get_text())
+                if match:
+                    episode_seen = match.group(1)
+
+            status_raw = status_el.get_text(strip=True)
+            status_label = self._MSV2_STATUS_LABELS.get(
+                status_raw.lower(), status_raw
+            )
+
+            parsed_item = {
+                "name": link.get_text(strip=True),
+                "id": link.get("href", "").split("/")[-1],
+                "score": score_el.get_text(strip=True) if score_el is not None else "",
+                "episode_seen": episode_seen,
+                "episode_total": eps_el.get_text(strip=True)
+                if eps_el is not None
+                else "",
+            }
+
+            grouped.setdefault(status_label, []).append(parsed_item)
+
+        return {
+            status: {
+                "items": drama_items,
+                "stats": {"Dramas": str(len(drama_items))},
+            }
+            for status, drama_items in grouped.items()
+        }
 
     def _parse_title(self, item: BeautifulSoup) -> str:
         label = item.find("h3", class_="mdl-style-list-label")
