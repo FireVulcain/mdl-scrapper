@@ -5,10 +5,10 @@ from typing import Any, Dict, List
 from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
-import cloudscraper
 from bs4 import BeautifulSoup
 
 from app import MYDRAMALIST_WEBSITE
+from app.lib.http import client as http_client
 from app.handlers.parser import BaseFetch
 
 
@@ -525,7 +525,7 @@ class FetchDramaList(BaseFetch):
 
         tbody = table.find("tbody") or table
         url = urljoin(MYDRAMALIST_WEBSITE, self.query)
-        client = cloudscraper.create_scraper()
+        client = http_client()
 
         page = 2
         while page <= self._MSV2_MAX_PAGES:

@@ -2,11 +2,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Type, TypeVar, Union
 from urllib.parse import urljoin
 
-import cloudscraper
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 
 from app import MYDRAMALIST_WEBSITE
+from app.lib.http import client as http_client
 
 T = TypeVar("T", bound="Parser")
 
@@ -20,9 +20,12 @@ ScrapeTypes = {
 class Parser:
     """Main Parser"""
 
+    # No User-Agent here on purpose. primp sets one that matches the TLS
+    # handshake it impersonates; overriding it with the Android Chrome 85 string
+    # this used to send would advertise a browser the fingerprint contradicts,
+    # which is exactly the mismatch Cloudflare looks for.
     headers: Dict[str, str] = {
         "Referer": MYDRAMALIST_WEBSITE,
-        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.123 Mobile Safari/537.36",
     }
 
     def __init__(
@@ -48,7 +51,7 @@ class Parser:
         soup = None
 
         try:
-            client = cloudscraper.create_scraper()
+            client = http_client()
             resp = client.get(url, headers=Parser.headers)
 
             # set the main soup var

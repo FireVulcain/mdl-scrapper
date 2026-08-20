@@ -1,10 +1,10 @@
 from typing import Any, Dict
 
-import cloudscraper
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.lib.msgspec_json import MsgSpecJSONResponse
+from app.lib.http import as_params, client as http_client
 from app.utils import fetch_func, search_func
 
 app = FastAPI(
@@ -138,8 +138,8 @@ async def fetch_person_threads(
     if after is not None:
         params["after"] = after
 
-    client = cloudscraper.create_scraper()
-    resp = client.get("https://mydramalist.com/v1/threads", params=params)
+    client = http_client()
+    resp = client.get("https://mydramalist.com/v1/threads", params=as_params(params))
 
     response.status_code = resp.status_code
     return resp.json()
@@ -397,7 +397,7 @@ async def fetch_top(
 
 @app.get("/tags/search")
 async def tags_search(q: str, response: Response) -> Any:
-    client = cloudscraper.create_scraper()
+    client = http_client()
     resp = client.get(
         "https://mydramalist.com/v1/tags/search",
         params={"lang": "en-US", "q": q, "approved": "true"},
@@ -429,8 +429,8 @@ async def fetch_threads(
     if after is not None:
         params["after"] = after
 
-    client = cloudscraper.create_scraper()
-    resp = client.get("https://mydramalist.com/v1/threads", params=params)
+    client = http_client()
+    resp = client.get("https://mydramalist.com/v1/threads", params=as_params(params))
 
     response.status_code = resp.status_code
     return resp.json()
@@ -443,9 +443,9 @@ async def mdlSeasonal(year: int, quarter: int) -> Any:
     # quarter -> every 3 months (Jan-Mar=1, Apr-Jun=2, Jul-Sep=3, Oct-Dec=4)
     # --- seasonal information --- winter --- spring --- summer --- fall ---
 
-    client = cloudscraper.create_scraper()
+    client = http_client()
 
     return client.post(
         "https://mydramalist.com/v1/quarter_calendar",
-        data={"quarter": quarter, "year": year},
+        data=as_params({"quarter": quarter, "year": year}),
     ).json()
