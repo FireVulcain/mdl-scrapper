@@ -700,28 +700,58 @@ class FetchDramaList(BaseFetch):
             if label is not None
         }
 
-    def _parse_drama(self, item: BeautifulSoup) -> List[Dict[str, str]]:
-        item_names = item.find_all("a", class_="title")
-        item_scores = item.find_all("span", class_="score")
-        item_episode_seens = item.find_all("span", class_="episode-seen")
-        item_episode_totals = item.find_all("span", class_="episode-total")
+    @staticmethod
+    def _cell(row: BeautifulSoup, name: str) -> str:
+        cell = row.find("td", class_=f"mdl-style-col-{name}")
+        return cell.get_text(strip=True) if cell is not None else ""
 
-        parsed_data = []
-        for name, score, seen, total in zip(
-            item_names,
-            item_scores,
-            item_episode_seens,
-            item_episode_totals,
-            strict=False,
-        ):
-            parsed_item = {
-                "name": name.get_text(strip=True),
-                "id": name.get("href", "").split("/")[-1],
-                "score": score.get_text(strip=True),
-                "episode_seen": seen.get_text(strip=True),
-                "episode_total": total.get_text(strip=True),
-            }
-            parsed_data.append(parsed_item)
+    def _parse_drama(self, item: BeautifulSoup) -> List[Dict[str, str]]:
+        """One row at a time, which is both more complete and less fragile.
+
+        This used to collect four lists by CSS class — every a.title, every
+        span.score, every span.episode-seen — and zip them together. That holds
+        only while every row carries all four. A single unrated title has no
+        span.score, and from that row on every score belongs to the wrong
+        drama; `strict=False` hides it by truncating instead of raising.
+
+        Walking the rows also reaches the three columns the classic layout has
+        always rendered and this never looked at: country, year and type. They
+        cost nothing extra, the markup is already downloaded, and they are the
+        difference between a list of names and a list one can actually read.
+        """
+        parsed_data: List[Dict[str, str]] = []
+
+        for row in item.find_all("tr"):
+            title_cell = row.find("td", class_="mdl-style-col-title")
+            if title_cell is None:
+                continue
+
+            link = title_cell.find("a", class_="title")
+            if link is None:
+                continue
+
+            progress = row.find("td", class_="mdl-style-col-progress")
+            seen = progress.find("span", class_="episode-seen") if progress else None
+            total = progress.find("span", class_="episode-total") if progress else None
+
+            # MDL repeats country and format together here for narrow screens —
+            # "Chinese Drama" — which is the phrasing it uses on its own hover
+            # card, so it is worth carrying as it stands rather than rebuilt.
+            kind = title_cell.find("div", class_="text-muted")
+
+            parsed_data.append(
+                {
+                    "name": link.get_text(strip=True),
+                    "id": link.get("href", "").split("/")[-1],
+                    "score": self._cell(row, "score"),
+                    "episode_seen": seen.get_text(strip=True) if seen is not None else "",
+                    "episode_total": total.get_text(strip=True) if total is not None else "",
+                    "country": self._cell(row, "country"),
+                    "year": self._cell(row, "year"),
+                    "type": self._cell(row, "type"),
+                    "kind": kind.get_text(strip=True) if kind is not None else "",
+                }
+            )
 
         return parsed_data
 
