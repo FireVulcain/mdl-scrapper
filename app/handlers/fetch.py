@@ -654,12 +654,38 @@ class FetchDramaList(BaseFetch):
                 status_raw.lower(), status_raw
             )
 
+            # This layout renders the artwork the classic one has no column for,
+            # already at the thumbnail size MDL uses on its own hover card. It is
+            # lazy-loaded, so the real address may sit in data-src.
+            poster = ""
+            img = title_el.find("img")
+            if img is not None:
+                poster = img.get("data-src") or img.get("src") or ""
+
+            # And it carries MDL's own rating beside the member's, which the
+            # classic layout never shows at all.
+            mdl_score = ""
+            mdl_el = row.find("td", class_="msv2-i-mdlscore")
+            if mdl_el is not None:
+                mdl_span = mdl_el.find("span", class_="score")
+                mdl_score = (
+                    mdl_span.get_text(strip=True)
+                    if mdl_span is not None
+                    else mdl_el.get_text(strip=True)
+                )
+
             parsed_item = {
                 "name": link.get_text(strip=True),
                 "id": drama_id,
                 "score": score,
                 "episode_seen": episode_seen,
                 "episode_total": episode_total,
+                "country": self._cell_text(row, "msv2-i-country"),
+                "year": self._cell_text(row, "msv2-i-year"),
+                "type": "",
+                "kind": "",
+                "poster": poster,
+                "mdl_score": mdl_score,
             }
 
             grouped.setdefault(status_label, []).append(parsed_item)
@@ -701,9 +727,13 @@ class FetchDramaList(BaseFetch):
         }
 
     @staticmethod
-    def _cell(row: BeautifulSoup, name: str) -> str:
-        cell = row.find("td", class_=f"mdl-style-col-{name}")
+    def _cell_text(row: BeautifulSoup, css_class: str) -> str:
+        cell = row.find("td", class_=css_class)
         return cell.get_text(strip=True) if cell is not None else ""
+
+    @classmethod
+    def _cell(cls, row: BeautifulSoup, name: str) -> str:
+        return cls._cell_text(row, f"mdl-style-col-{name}")
 
     def _parse_drama(self, item: BeautifulSoup) -> List[Dict[str, str]]:
         """One row at a time, which is both more complete and less fragile.
@@ -750,6 +780,11 @@ class FetchDramaList(BaseFetch):
                     "year": self._cell(row, "year"),
                     "type": self._cell(row, "type"),
                     "kind": kind.get_text(strip=True) if kind is not None else "",
+                    # Both layouts answer with the same keys so a caller never has
+                    # to know which one it got. The classic one renders no artwork
+                    # and no MDL rating, so these stay empty rather than absent.
+                    "poster": "",
+                    "mdl_score": "",
                 }
             )
 
