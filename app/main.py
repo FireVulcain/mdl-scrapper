@@ -292,7 +292,7 @@ def _resolve_genres(
 
 
 def _build_top_query(
-    co: int | None,
+    co: str | None,
     st: int,
     so: str,
     page: int,
@@ -371,14 +371,23 @@ async def fetch_top(
     tag: str | None = None,
     tag_exclude: str | None = None,
 ) -> Dict[str, Any]:
-    co = _TOP_COUNTRY_CODES.get(country.lower())
-    if co is None:
-        response.status_code = 400
-        return {
-            "error": True,
-            "code": 400,
-            "description": f"Unknown country '{country}'. Supported values: {', '.join(_TOP_COUNTRY_CODES)}.",
-        }
+    codes = []
+    for raw in country.split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+
+        code = _TOP_COUNTRY_CODES.get(raw.lower())
+        if code is None:
+            response.status_code = 400
+            return {
+                "error": True,
+                "code": 400,
+                "description": f"Unknown country '{raw}'. Supported values: {', '.join(_TOP_COUNTRY_CODES)}.",
+            }
+        codes.append(str(code))
+
+    co = ",".join(codes) if codes else None
 
     st, so, err = _validate_top_filters(status, sort, response)
     if err:
