@@ -1205,28 +1205,31 @@ class FetchTopShows(BaseFetch):
                 "synopsis": synopsis,
             })
 
-        # Pagination
+        # Pagination — MDL only renders a `last` link on large result sets; on
+        # short ones it shows just the numbered pages and a `next`, so take the
+        # total from the highest page number appearing anywhere in the widget.
         pagination: Dict[str, Any] = {}
         pag_ul = container.find("ul", class_="pagination")
         if pag_ul:
             active = pag_ul.find("li", class_="active")
+            current_page = 1
             if active:
                 try:
-                    pagination["current_page"] = int(active.get_text(strip=True))
+                    current_page = int(active.get_text(strip=True))
                 except ValueError:
                     pass
-            last_link = pag_ul.find("li", class_="last")
-            if last_link:
-                last_a = last_link.find("a")
-                if last_a and last_a.get("href"):
-                    href = last_a["href"]
-                    import re as _re
-                    m = _re.search(r"page=(\d+)", href)
-                    if m:
-                        try:
-                            pagination["total_pages"] = int(m.group(1))
-                        except ValueError:
-                            pass
+            pagination["current_page"] = current_page
+
+            page_numbers = [current_page]
+            for a in pag_ul.find_all("a", class_="page-link"):
+                m = re.search(r"page=(\d+)", a.get("href", ""))
+                if m:
+                    page_numbers.append(int(m.group(1)))
+            pagination["total_pages"] = max(page_numbers)
+
+            next_link = pag_ul.find("li", class_="next")
+            next_a = next_link.find("a", href=True) if next_link else None
+            pagination["has_next"] = bool(next_a and next_a["href"].strip())
 
         self.info["shows"] = shows
         self.info["pagination"] = pagination
