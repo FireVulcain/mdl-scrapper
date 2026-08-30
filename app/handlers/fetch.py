@@ -1388,3 +1388,65 @@ class FetchPhotos(BaseFetch):
 
     def _get(self) -> None:
         self._get_main_container()
+
+
+class FetchRatings(BaseFetch):
+    """Scrapes the rating trend from a title's statistics page.
+
+    The `overall_ratings` chart is drawn client-side by Highcharts, so its SVG
+    never exists in the raw HTML. The data behind it, however, is embedded
+    server-side in an inline <script> as the Highcharts config, so we parse that
+    config rather than the (JS-generated) chart.
+    """
+
+    def __init__(self, soup: BeautifulSoup, query: str, code: int, ok: bool) -> None:
+        super().__init__(soup, query, code, ok)
+
+    def _get_main_container(self) -> None:
+        if self.soup is None:
+            return
+
+        container = self.soup.find("div", class_="app-body")
+        if container is None:
+            return
+
+        title_tag = container.find("h1", class_="film-title")
+        self.info["title"] = title_tag.get_text(strip=True) if title_tag else ""
+
+        self.info["overall_ratings"] = self._parse_overall_ratings()
+
+    def _parse_overall_ratings(self) -> List[Dict[str, Any]]:
+        # find the inline script that configures the charts
+        script = None
+        for s in self.soup.find_all("script"):
+            if s.string and "#overall_ratings" in s.string:
+                script = s.string
+                break
+        if script is None:
+            return []
+
+        # isolate the overall_ratings chart config from the neighbouring ones
+        start = script.find("#overall_ratings")
+        nxt = script.find("$('#", start + 1)
+        block = script[start:nxt] if nxt != -1 else script[start:]
+
+        # within the block the first `categories:` is the x-axis (dates) and the
+        # first `data:` is the Ratings series (plotLines use `value:`, not data)
+        cats_m = re.search(r"categories:\s*(\[.*?\])", block, re.DOTALL)
+        data_m = re.search(r"data:\s*(\[.*?\])", block, re.DOTALL)
+        if cats_m is None or data_m is None:
+            return []
+
+        try:
+            categories = json.loads(cats_m.group(1))
+            data = json.loads(data_m.group(1))
+        except Exception:
+            return []
+
+        return [
+            {"date": date, "rating": rating}
+            for date, rating in zip(categories, data, strict=False)
+        ]
+
+    def _get(self) -> None:
+        self._get_main_container()

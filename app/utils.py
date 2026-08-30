@@ -9,6 +9,7 @@ from app.handlers.fetch import (
     FetchList,
     FetchPerson,
     FetchPhotos,
+    FetchRatings,
     FetchRecommendations,
     FetchReviews,
     FetchTopShows,
@@ -49,6 +50,7 @@ fs = {
     "dramalist": FetchDramaList,
     "episodes": FetchEpisodes,
     "episode": FetchEpisode,
+    "ratings": FetchRatings,
 }
 
 

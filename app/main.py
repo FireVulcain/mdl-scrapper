@@ -77,6 +77,14 @@ async def fetch_drama_photos(
     return r
 
 
+@app.get("/id/{drama_id}/ratings")
+async def fetch_ratings(drama_id: str, response: Response) -> Dict[str, Any]:
+    code, r = await fetch_func(query=f"{drama_id}/statistics", t="ratings")
+
+    response.status_code = code
+    return r
+
+
 @app.get("/id/{drama_id}/recs")
 async def fetch_recs(drama_id: str, response: Response) -> Dict[str, Any]:
     code, r = await fetch_func(query=f"{drama_id}/recs", t="recs")
