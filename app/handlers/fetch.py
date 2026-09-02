@@ -146,6 +146,29 @@ class FetchDrama(BaseFetch):
                             tag_id = int(m.group(1))
                         tags.append({"id": tag_id, "name": a.get_text(strip=True)})
                     self.info["others"][_key] = tags
+                elif _key == "related_content":
+                    related = []
+                    for div in i.find_all("div", class_="title"):
+                        a = div.find("a")
+                        if a is None:
+                            continue
+
+                        href = a.get("href", "")
+                        # trailing text after the link is the relation note,
+                        # e.g. "(Chinese original story)"
+                        note = div.get_text(" ", strip=True).replace(
+                            a.get_text(strip=True), "", 1
+                        ).strip(" ()")
+
+                        related.append(
+                            {
+                                "name": a.get_text(strip=True),
+                                "id": href.split("/")[-1],
+                                "link": urljoin(MYDRAMALIST_WEBSITE, href),
+                                "note": note,
+                            }
+                        )
+                    self.info["others"][_key] = related
                 else:
                     self.info["others"][_key] = [
                         i.strip()
