@@ -73,6 +73,18 @@ class Search(BaseSearch):
 
         return t, year, series_ep
 
+    # get the short synopsis of the result
+    def _res_get_synopsis(self, result_container: Union[Tag, NavigableString]) -> str:
+        # the synopsis is the <p> that isn't the rating line (which holds the
+        # score span); it is missing on some results, so default to empty
+        for p in result_container.find_all("p"):  # type: ignore
+            if p.find("span", class_="score"):
+                continue
+            text = p.get_text(strip=True)
+            if text:
+                return text
+        return ""
+
     # extract the urls of the search result
     def _res_get_url(self, result_container: Union[Tag, NavigableString]) -> str:
         return urljoin(
@@ -136,6 +148,9 @@ class Search(BaseSearch):
                     r["rating"] = float(score_elem.text.strip()) if score_elem and score_elem.text.strip() else None
                 except ValueError:
                     r["rating"] = None
+
+                # synopsis
+                r["synopsis"] = self._res_get_synopsis(result)
 
                 _dramas.append(r)
                 continue
