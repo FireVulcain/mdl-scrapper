@@ -35,6 +35,12 @@ DEFAULT_TIMEOUT = 25
 # overrides either way.
 CLIENT = os.environ.get("MDL_CLIENT") or ("cloudscraper" if os.environ.get("VERCEL") else "primp")
 
+# Cloudflare went on to refuse every datacenter address, Vercel's included, and
+# let only residential ones through. MDL_PROXY sends the calls out through one —
+# e.g. "http://100.x.y.z:8888", a proxy on a home machine reached over Tailscale.
+# Unset, calls leave directly.
+PROXY = os.environ.get("MDL_PROXY") or None
+
 
 class _CloudscraperClient:
     """cloudscraper behind primp's call shape: a timeout set once, not per call."""
@@ -43,6 +49,8 @@ class _CloudscraperClient:
         import cloudscraper  # type: ignore[import-untyped]
 
         self._session = cloudscraper.create_scraper()
+        if PROXY:
+            self._session.proxies = {"http": PROXY, "https": PROXY}
         self._timeout = timeout
 
     def get(self, url: str, **kwargs: Any) -> Any:
@@ -55,7 +63,7 @@ class _CloudscraperClient:
 def client(timeout: int = DEFAULT_TIMEOUT) -> Any:
     if CLIENT == "cloudscraper":
         return _CloudscraperClient(timeout)
-    return primp.Client(impersonate=IMPERSONATE, timeout=timeout)
+    return primp.Client(impersonate=IMPERSONATE, timeout=timeout, proxy=PROXY)
 
 
 def as_params(values: Dict[str, Any]) -> Dict[str, str]:
