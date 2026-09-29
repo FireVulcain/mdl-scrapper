@@ -17,6 +17,7 @@ answered 12 out of 12. That is what makes self-hosting the scraper possible.
 Everything goes through here so the profile is decided once.
 """
 
+import os
 from typing import Any, Dict
 
 import primp
@@ -27,8 +28,33 @@ IMPERSONATE = "chrome_131"
 
 DEFAULT_TIMEOUT = 25
 
+# Which client leaves for MDL: "primp" or "cloudscraper". On 2026-09-29 MDL
+# refused primp from both Hetzner and Vercel (403 on every slug) while
+# cloudscraper still passed from a home connection, so Vercel — which sets
+# VERCEL=1 — falls back to the client it used before primp. MDL_CLIENT
+# overrides either way.
+CLIENT = os.environ.get("MDL_CLIENT") or ("cloudscraper" if os.environ.get("VERCEL") else "primp")
 
-def client(timeout: int = DEFAULT_TIMEOUT) -> primp.Client:
+
+class _CloudscraperClient:
+    """cloudscraper behind primp's call shape: a timeout set once, not per call."""
+
+    def __init__(self, timeout: int) -> None:
+        import cloudscraper  # type: ignore[import-untyped]
+
+        self._session = cloudscraper.create_scraper()
+        self._timeout = timeout
+
+    def get(self, url: str, **kwargs: Any) -> Any:
+        return self._session.get(url, timeout=self._timeout, **kwargs)
+
+    def post(self, url: str, **kwargs: Any) -> Any:
+        return self._session.post(url, timeout=self._timeout, **kwargs)
+
+
+def client(timeout: int = DEFAULT_TIMEOUT) -> Any:
+    if CLIENT == "cloudscraper":
+        return _CloudscraperClient(timeout)
     return primp.Client(impersonate=IMPERSONATE, timeout=timeout)
 
 
