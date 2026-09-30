@@ -22,9 +22,13 @@ from typing import Any, Dict
 
 import primp
 
-# Desktop Chrome, the handshake MDL sees most. chrome_130, firefox_133 and
-# safari_18 were tested and pass too — this is a preference, not a dependency.
-IMPERSONATE = "chrome_131"
+# Desktop Safari. It was chrome_131 until 2026-09-30, when Cloudflare began
+# challenging primp's chrome_131 and chrome_133 handshakes — MDL's /v1 JSON API
+# first (threads, tag search), then its pages — even from a residential
+# address, while safari_18, firefox_135 and cloudscraper still passed. primp's
+# Chrome profiles lag the real browser by several versions, which is the likely
+# reason; if this one starts failing too, try the others before anything else.
+IMPERSONATE = "safari_18"
 
 DEFAULT_TIMEOUT = 25
 
