@@ -22,13 +22,17 @@ from typing import Any, Dict
 
 import primp
 
-# Desktop Safari. It was chrome_131 until 2026-09-30, when Cloudflare began
-# challenging primp's chrome_131 and chrome_133 handshakes — MDL's /v1 JSON API
-# first (threads, tag search), then its pages — even from a residential
-# address, while safari_18, firefox_135 and cloudscraper still passed. primp's
-# Chrome profiles lag the real browser by several versions, which is the likely
-# reason; if this one starts failing too, try the others before anything else.
-IMPERSONATE = "safari_18"
+# The newest Safari this primp knows. primp 2 names profiles generically
+# ("chrome", "safari", "firefox", "edge") for its latest of each, so keeping up
+# with browsers is a dependency bump rather than a code change.
+#
+# Not Chrome. On 2026-09-30 Cloudflare began challenging primp 0.15's
+# chrome_131 and chrome_133 from a residential address — MDL's /v1 JSON API
+# first (threads, tag search), then its pages. primp 2's Chromium profiles fare
+# no better: over the same 20 requests, "chrome" drew 403s on 2 to 6 and "edge"
+# on 11, while "safari" and "firefox" drew none. If Safari starts drawing them,
+# Firefox is the next name to try.
+IMPERSONATE = "safari"
 
 DEFAULT_TIMEOUT = 25
 
@@ -50,7 +54,7 @@ class _CloudscraperClient:
     """cloudscraper behind primp's call shape: a timeout set once, not per call."""
 
     def __init__(self, timeout: int) -> None:
-        import cloudscraper  # type: ignore[import-untyped]
+        import cloudscraper  # type: ignore[import-untyped,import-not-found,unused-ignore]
 
         self._session = cloudscraper.create_scraper()
         if PROXY:
